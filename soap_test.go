@@ -1,6 +1,7 @@
 package gosoap
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -18,7 +19,7 @@ var (
 			Err: false,
 		},
 		{
-			URL: "http://www.webservicex.net/geoipservice.asmx?WSDL",
+			URL: "http://soapclient.com/xml/SQLDataSoap.WSDL",
 			Err: true,
 		},
 	}
@@ -33,11 +34,11 @@ func TestSoapClient(t *testing.T) {
 	}
 }
 
-type GetGeoIPResponse struct {
-	GetGeoIPResult GetGeoIPResult
+type SQLDataSRLResponse struct {
+	SQLDataSRLResult SQLDataSRLResult
 }
 
-type GetGeoIPResult struct {
+type SQLDataSRLResult struct {
 	ReturnCode        string
 	IP                string
 	ReturnCodeDetails string
@@ -46,52 +47,53 @@ type GetGeoIPResult struct {
 }
 
 var (
-	r GetGeoIPResponse
+	r SQLDataSRLResponse
 
-	params = Params{}
+	params = Params{"SRLFile": "WHOIS.SRI", "RequestName": "whois"}
 )
 
 func TestClient_Call(t *testing.T) {
-	soap, err := SoapClient("http://www.webservicex.net/geoipservice.asmx?WSDL")
+	var (
+		soap *Client
+		res  *Response
+		err  error
+	)
+	soap, err = SoapClient("http://soapclient.com/xml/SQLDataSoap.WSDL")
 	if err != nil {
 		t.Errorf("error not expected: %s", err)
 	}
-
-	err = soap.Call("GetGeoIP", params)
-	if err == nil {
-		t.Errorf("params is empty")
-	}
-
-	params["IPAddress"] = "8.8.8.8"
-	err = soap.Call("", params)
+	soap.URL = ""
+	params["key"] = "apple.com"
+	res, err = soap.Call("", params)
 	if err == nil {
 		t.Errorf("method is empty")
 	}
 
-	err = soap.Unmarshal(&r)
+	err = res.Unmarshal(&r)
 	if err == nil {
 		t.Errorf("body is empty")
 	}
 
-	err = soap.Call("GetGeoIP", params)
+	res, err = soap.Call("SQLDataSRL", params)
 	if err != nil {
 		t.Errorf("error in soap call: %s", err)
 	}
 
-	soap.Unmarshal(&r)
-	if r.GetGeoIPResult.CountryCode != "USA" {
+	fmt.Println(string(res.Body))
+	res.Unmarshal(&r)
+	if r.SQLDataSRLResult.CountryCode != "USA" {
 		t.Errorf("error: %+v", r)
 	}
 
 	c := &Client{}
-	err = c.Call("", Params{})
+	_, err = c.Call("", Params{})
 	if err == nil {
 		t.Errorf("error expected but nothing got.")
 	}
 
 	c.WSDL = "://test."
 
-	err = c.Call("GetGeoIP", params)
+	_, err = c.Call("SQLDataSRL", params)
 	if err == nil {
 		t.Errorf("invalid WSDL")
 	}

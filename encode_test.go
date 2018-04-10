@@ -10,10 +10,6 @@ var (
 		Err    string
 	}{
 		{
-			Params: Params{},
-			Err:    "params size is empty",
-		},
-		{
 			Params: Params{"": ""},
 			Err:    "error expected: xml: start tag with no name",
 		},
@@ -21,13 +17,13 @@ var (
 )
 
 func TestClient_MarshalXML(t *testing.T) {
-	soap, err := SoapClient("http://www.webservicex.net/geoipservice.asmx?WSDL")
+	soap, err := SoapClient("http://soapclient.com/xml/SQLDataSoap.WSDL")
 	if err != nil {
 		t.Errorf("error not expected: %s", err)
 	}
 
 	for _, test := range tests {
-		err = soap.Call("GetGeoIP", test.Params)
+		_, err := soap.Call("SQLDataSRL", test.Params)
 		if err == nil {
 			t.Errorf(test.Err)
 		}

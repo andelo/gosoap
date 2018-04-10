@@ -37,55 +37,72 @@ func SoapClient(wsdl string) (*Client, error) {
 // Client struct hold all the informations about WSDL,
 // request and response of the server
 type Client struct {
-	WSDL         string
-	URL          string
-	Method       string
-	Params       Params
-	HeaderParams Params
-	Definitions  *wsdlDefinitions
-	Body         []byte
-	Header       []byte
-
-	payload []byte
+	WSDL        string
+	URL         string
+	Method      string
+	Params      Params
+	Definitions *wsdlDefinitions
+	Header      []interface{}
+	payload     []byte
 }
 
-// Call call's the method m with Params p
-func (c *Client) Call(m string, p Params) (err error) {
+type Response struct {
+	Body   []byte
+	Header []byte
+}
+
+// Call call's the method m with Params p and optional soap headers h
+func (c *Client) Call(m string, p Params, h ...interface{}) (res *Response, err error) {
+	var payload []byte
 	c.Method = m
 	c.Params = p
-
-	c.payload, err = xml.MarshalIndent(c, "", "")
-	if err != nil {
-		return err
+	if len(h) > 0 {
+		c.Header = h
 	}
+
+	payload, err = xml.MarshalIndent(c, "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	buf.WriteString(xml.Header)
+	buf.Write(payload)
+	c.payload = buf.Bytes()
 
 	b, err := c.doRequest()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var soap SoapEnvelope
 	err = xml.Unmarshal(b, &soap)
 
-	c.Body = soap.Body.Contents
-	c.Header = soap.Header.Contents
+	res = &Response{
+		Body:   soap.Body.Contents,
+		Header: soap.Header.Contents,
+	}
 
-	return err
+	return res, err
 }
 
 // Unmarshal get the body and unmarshal into the interface
-func (c *Client) Unmarshal(v interface{}) error {
-	if len(c.Body) == 0 {
-		return fmt.Errorf("Body is empty")
+func (r *Response) Unmarshal(v interface{}) error {
+	if r == nil {
+		return fmt.Errorf("response is nil")
+	}
+
+	if len(r.Body) == 0 {
+		return fmt.Errorf("response body is empty")
 	}
 
 	var f Fault
-	xml.Unmarshal(c.Body, &f)
+	xml.Unmarshal(r.Body, &f)
 	if f.Code != "" {
 		return fmt.Errorf("[%s]: %s", f.Code, f.Description)
 	}
 
-	return xml.Unmarshal(c.Body, v)
+	return xml.Unmarshal(r.Body, v)
 }
 
 // doRequest makes new request to the server using the c.Method, c.URL and the body.

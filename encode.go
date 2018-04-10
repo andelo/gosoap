@@ -3,6 +3,7 @@ package gosoap
 import (
 	"encoding/xml"
 	"fmt"
+	"reflect"
 )
 
 var tokens []xml.Token
@@ -18,19 +19,31 @@ func (c Client) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 	}
 
 	startEnvelope()
-	if len(c.HeaderParams) > 0 {
+	if c.Header != nil && len(c.Header) > 0 {
 		startHeader()
-		for k, v := range c.HeaderParams {
+		for _, h := range c.Header {
+			header := reflect.ValueOf(h)
 			t := xml.StartElement{
 				Name: xml.Name{
-					Space: "",
-					Local: k,
+					Space: c.Definitions.TargetNamespace,
+					Local: reflect.Indirect(header).Type().Name(),
 				},
 			}
+			tokens = append(tokens, t)
+			for i := 0; i < header.NumField(); i++ {
+				name := header.Type().Field(i).Name
+				value := fmt.Sprintf("%v", header.Field(i))
 
-			tokens = append(tokens, t, xml.CharData(v), xml.EndElement{Name: t.Name})
+				t := xml.StartElement{
+					Name: xml.Name{
+						Space: "",
+						Local: name,
+					},
+				}
+				tokens = append(tokens, t, xml.CharData(value), xml.EndElement{Name: t.Name})
+			}
+			tokens = append(tokens, xml.EndElement{Name: t.Name})
 		}
-
 		endHeader()
 	}
 
@@ -40,14 +53,16 @@ func (c Client) MarshalXML(e *xml.Encoder, _ xml.StartElement) error {
 	}
 
 	for k, v := range c.Params {
-		t := xml.StartElement{
-			Name: xml.Name{
-				Space: "",
-				Local: k,
-			},
-		}
+		if k != "" {
+			t := xml.StartElement{
+				Name: xml.Name{
+					Space: "",
+					Local: k,
+				},
+			}
 
-		tokens = append(tokens, t, xml.CharData(v), xml.EndElement{Name: t.Name})
+			tokens = append(tokens, t, xml.CharData(v), xml.EndElement{Name: t.Name})
+		}
 	}
 	//end envelope
 	endBody(c.Method)
